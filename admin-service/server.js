@@ -3,6 +3,9 @@ const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cors = require('cors');
+require('dotenv').config();
+const logger = require('./logger');
+
 
 // טעינת הגדרות מקובץ .env
 dotenv.config();
@@ -18,10 +21,10 @@ app.use(express.urlencoded({ extended: true }));
 // התחברות ל-MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
-    console.log(`✅ Connected to MongoDB Atlas! (Service: ${process.env.SERVICE_NAME})`);
+    console.log(`Connected to MongoDB Atlas! (Service: ${process.env.SERVICE_NAME})`);
   })
   .catch(err => {
-    console.error('❌ Database connection error:', err);
+    console.error('Database connection error:', err);
   });
 
 // ראוט בדיקה פשוט
@@ -31,5 +34,6 @@ app.get('/', (req, res) => {
 
 // הרצת השרת
 app.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
+  logger.info({ service: process.env.SERVICE_NAME }, 'logger test from admin-service');
 });
