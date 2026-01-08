@@ -1,0 +1,10 @@
+# Ignore node_modules in all subfolders
+**/node_modules
+node_modules
+
+# Ignore environment variables (secrets)
+.env
+**/.env
+
+# Ignore system files
+.DS_Store
