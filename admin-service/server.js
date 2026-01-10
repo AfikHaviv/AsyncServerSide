@@ -1,23 +1,26 @@
-// server.js - Template for all services
+// admin-service/server.js
 const express = require('express');
 const mongoose = require('mongoose');
-const dotenv = require('dotenv');
 const cors = require('cors');
-require('dotenv').config();
+require('dotenv').config(); 
 const logger = require('./logger');
 
-
-// טעינת הגדרות מקובץ .env
-dotenv.config();
+// 2. Import the About Route
+const aboutRouter = require('./routes/about'); 
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3003;
 
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Custom Logging Middleware
 app.use((req, res, next) => {
-  console.log('MIDDLEWARE HIT', req.method, req.originalUrl); // זמני לבדיקה
   const start = Date.now();
-
   res.on('finish', () => {
+    // This saves the log to MongoDB
     logger.info({
       service: process.env.SERVICE_NAME,
       method: req.method,
@@ -26,28 +29,29 @@ app.use((req, res, next) => {
       responseTimeMs: Date.now() - start
     }, 'http request');
   });
-
   next();
 });
 
-
-// התחברות ל-MongoDB
+// Connection to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
-    console.log(`Connected to MongoDB Atlas! (Service: ${process.env.SERVICE_NAME})`);
+    console.log(`✅ Connected to MongoDB Atlas! (Service: ${process.env.SERVICE_NAME})`);
   })
   .catch(err => {
-    console.error('Database connection error:', err);
+    console.error('❌ Database connection error:', err);
   });
 
-// ראוט בדיקה פשוט
+// 3. Use the About Route
+// creates the endpoint: http://localhost:3003/api/about
+app.use('/api', aboutRouter); 
+
+// Simple health check route
 app.get('/', (req, res) => {
-  res.send(`Hello from ${process.env.SERVICE_NAME} on port ${PORT}`);
+  res.send(`Hello from ${process.env.SERVICE_NAME}`);
 });
 
-// הרצת השרת
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  logger.info({ service: process.env.SERVICE_NAME }, 'logger test from admin-service');
+  console.log(`🚀 Server is running on port ${PORT}`);
+  // Optional: Log that server started
+  logger.info({ service: process.env.SERVICE_NAME }, 'Server started');
 });
-
