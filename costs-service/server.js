@@ -1,44 +1,52 @@
-// costs-service/server.js
-
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-require('dotenv').config(); // טעינת משתני סביבה
-const logger = require('./logger'); // הלוגר שלנו
+require('dotenv').config();
+const logger = require('./logger');
 
-// --- השינוי החשוב: ייבוא קובץ הנתיבים שיצרת ---
-const costsRouter = require('./routes/costs.routes'); 
+const costsRouter = require('./routes/costs.routes');
 
 const app = express();
-const PORT = process.env.PORT || 3002; // ברירת מחדל לפורט של ה-costs
+const PORT = process.env.PORT || 3002;
 
 // Middleware
 app.use(cors());
-app.use(express.json()); // חובה כדי לקרוא JSON
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- חיבור הנתיבים לשרת ---
-// כל בקשה שתתחיל ב "/api" תעבור לקובץ costs.routes.js
-// דוגמה: /api/add או /api/report
-app.use('/api', costsRouter); 
-
-// בדיקת "דופק" (Health Check) פשוטה
-app.get('/', (req, res) => {
-  res.send(`Costs Service is running on port ${PORT}`);
+// Logging middleware (לכל בקשה)
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    logger.info({
+      service: process.env.SERVICE_NAME,
+      method: req.method,
+      url: req.originalUrl,
+      statusCode: res.statusCode,
+      responseTimeMs: Date.now() - start,
+    }, 'http request');
+  });
+  next();
 });
 
-// התחברות ל-MongoDB
+// Routes
+app.use('/api', costsRouter);
+
+app.get('/', (req, res) => {
+  res.send(`Hello from ${process.env.SERVICE_NAME} on port ${PORT}`);
+});
+
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
-    logger.info(`✅ Costs-Service Connected to MongoDB Atlas!`);
+    console.log('✅ Connected to MongoDB Atlas');
+    logger.info({ service: process.env.SERVICE_NAME }, '✅ Connected to MongoDB Atlas');
   })
   .catch(err => {
-    logger.error('❌ Database connection error:', err);
+    console.error('❌ Database connection error:', err.message);
+    logger.error({ err: err.message }, '❌ Database connection error');
   });
 
-// הרצת השרת
 app.listen(PORT, () => {
   console.log(`🚀 Costs Service is running on port ${PORT}`);
-  // שליחת לוג ראשוני כדי לוודא שהלוגר עובד
-  logger.info({ service: 'Costs-Service', status: 'started' }, 'Costs Service started successfully');
+  logger.info({ service: process.env.SERVICE_NAME, status: 'started' }, 'server started');
 });

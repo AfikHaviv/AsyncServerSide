@@ -1,28 +1,11 @@
 const mongoose = require('mongoose');
 
-const costSchema = new mongoose.Schema({
-  userid: { 
-    type: Number, 
-    required: true 
-  },
-  description: { 
-    type: String, 
-    required: true 
-  },
-  sum: { 
-    type: Number, 
-    required: true 
-  },
-  category: { 
-    type: String, 
-    // אלו הקטגוריות שחובה לתמוך בהן לפי המסמך
-    enum: ['food', 'health', 'housing', 'sport', 'education'], 
-    required: true 
-  },
-  created_at: { 
-    type: Date, 
-    default: Date.now // ברירת מחדל: הזמן הנוכחי
-  }
+const CostSchema = new mongoose.Schema({
+  userid: { type: Number, required: true },
+  description: { type: String, required: true, trim: true },
+  category: { type: String, required: true },
+  sum: { type: Number, required: true, min: 0 },
+  created_at: { type: Date, required: true, default: Date.now },
 });
 
-module.exports = mongoose.model('Cost', costSchema);
+module.exports = mongoose.model('Cost', CostSchema);
