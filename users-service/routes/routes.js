@@ -81,6 +81,7 @@ router.get('/api/users', async (req, res) => {
 router.get('/api/users/:id', async (req, res) => {
   try {
     const userId = Number(req.params.id);
+    const mongoose = require('mongoose'); // חובה לייבא את מונגוס כדי לגשת לקולקשן הכללי
 
     if (Number.isNaN(userId)) {
       return sendError(res, 400, 'INVALID_ID', 'id must be a number');
@@ -91,17 +92,27 @@ router.get('/api/users/:id', async (req, res) => {
       return sendError(res, 404, 'USER_NOT_FOUND', 'user not found');
     }
 
-    // כרגע נחזיר total=0 עד שנחבר ל-costs
-    // (אחרי שתבני costs-service, נחבר פה חישוב אמיתי)
+    // --- התיקון: חישוב הטוטאל האמיתי מקולקשן costs ---
+    const result = await mongoose.connection.db.collection('costs').aggregate([
+        { $match: { userid: userId } },
+        { $group: { _id: null, total: { $sum: "$sum" } } }
+    ]).toArray();
+
+    const totalCosts = result.length > 0 ? result[0].total : 0;
+    // ------------------------------------------------
+
     return res.json({
       id: user.id,
       first_name: user.first_name,
       last_name: user.last_name,
-      total: 0,
+      total: totalCosts, // מחזירים את המספר שחושב
+      birthday: user.birthday // כדאי להחזיר גם את יום ההולדת אם זה נדרש
     });
   } catch (err) {
     return sendError(res, 500, 'SERVER_ERROR', err.message || 'unexpected error');
   }
 });
+
+
 
 module.exports = router;

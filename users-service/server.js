@@ -22,6 +22,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(usersRoutes);
 
 
+
+
 // התחברות ל-MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
@@ -30,6 +32,21 @@ mongoose.connect(process.env.MONGODB_URI)
   .catch(err => {
     console.error('❌ Database connection error:', err);
   });
+
+  // Logging middleware - חובה להוסיף את זה!
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    logger.info({
+      service: process.env.SERVICE_NAME,
+      method: req.method,
+      url: req.originalUrl,
+      statusCode: res.statusCode,
+      responseTimeMs: Date.now() - start,
+    }, 'http request');
+  });
+  next();
+});
 
 // ראוט בדיקה פשוט
 app.get('/', (req, res) => {
