@@ -3,6 +3,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cors = require('cors');
+require('dotenv').config();
+const logger = require('./logger');
 
 // טעינת הגדרות מקובץ .env
 dotenv.config();
@@ -32,4 +34,5 @@ app.get('/', (req, res) => {
 // הרצת השרת
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
+  logger.info({ service: process.env.SERVICE_NAME }, 'logger test from costs-service');
 });
