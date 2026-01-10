@@ -6,7 +6,7 @@ const cors = require('cors');
 require('dotenv').config();
 const logger = require('./logger');
 
-const usersRoutes = require('./routes/routes');
+const usersRoutes = require('./routes/users');
 
 // טעינת הגדרות מקובץ .env
 dotenv.config();
