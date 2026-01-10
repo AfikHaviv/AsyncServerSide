@@ -6,6 +6,8 @@ const cors = require('cors');
 require('dotenv').config();
 const logger = require('./logger');
 
+const usersRoutes = require('./routes/routes');
+
 // טעינת הגדרות מקובץ .env
 dotenv.config();
 
@@ -16,6 +18,9 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json()); // כדי שנוכל לקרוא JSON שנשלח ב-Body
 app.use(express.urlencoded({ extended: true }));
+
+app.use(usersRoutes);
+
 
 // התחברות ל-MongoDB
 mongoose.connect(process.env.MONGODB_URI)
