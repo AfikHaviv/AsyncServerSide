@@ -1,24 +1,25 @@
+// costs-service/routes/costs.routes.js
 const express = require('express');
 const router = express.Router();
 const Cost = require('../models/cost.model');
 const Report = require('../models/report.model');
 const logger = require('../logger');
 
+// categories allowed
 const categories = ['food', 'health', 'housing', 'sports', 'education'];
 
 function badRequest(res, id, message) {
   return res.status(400).json({ id, message });
 }
 
+// Check if user exists in users service
 async function userExists(userid) {
   const usersBaseUrl = process.env.USERS_SERVICE_URL || 'http://localhost:3001';
   const resp = await fetch(`${usersBaseUrl}/api/users/${userid}`);
   return resp.ok;
 }
 
-// ---------------------------------------------------------
 // POST /api/add
-// ---------------------------------------------------------
 router.post('/add', async (req, res) => {
   try {
     const { userid, description, sum, category, created_at } = req.body;
@@ -32,12 +33,15 @@ router.post('/add', async (req, res) => {
     const userIdNum = Number(userid);
     const sumNum = Number(sum);
 
+    // userid validation
     if (Number.isNaN(userIdNum) || userIdNum <= 0) {
       return badRequest(res, 'INVALID_USERID', 'userid must be a positive number');
     }
+    // description validation
     if (typeof description !== 'string' || description.trim().length === 0) {
       return badRequest(res, 'INVALID_DESCRIPTION', 'description must be a non-empty string');
     }
+    // sum validation
     if (Number.isNaN(sumNum) || sumNum <= 0) {
       return badRequest(res, 'INVALID_SUM', 'sum must be a positive number');
     }
@@ -47,7 +51,7 @@ router.post('/add', async (req, res) => {
       return badRequest(res, 'INVALID_CATEGORY', `category must be one of: ${categories.join(', ')}`);
     }
 
-    // user exists (Q&A requirement)
+    // user existence check
     const exists = await userExists(userIdNum);
     if (!exists) {
       return res.status(404).json({
@@ -56,7 +60,7 @@ router.post('/add', async (req, res) => {
       });
     }
 
-    // date rule: cannot be in the past
+    // date cannot be in the past
     let dateToSave = new Date();
     if (created_at !== undefined) {
       const parsed = new Date(created_at);
@@ -70,6 +74,7 @@ router.post('/add', async (req, res) => {
       dateToSave = parsed;
     }
 
+    // create and save cost
     const newCost = new Cost({
       userid: userIdNum,
       description: description.trim(),
@@ -78,6 +83,7 @@ router.post('/add', async (req, res) => {
       created_at: dateToSave,
     });
 
+    // save to DB
     await newCost.save();
 
     logger.info({ message: 'Cost added successfully', costId: newCost._id }, 'cost added');
@@ -89,9 +95,15 @@ router.post('/add', async (req, res) => {
   }
 });
 
-// ---------------------------------------------------------
+/*
+ * Computed Design Pattern Implementation:
+ * 1. Check if a report for this user/year/month already exists in the 'reports' collection.
+ * 2. If it exists, return the cached document to save processing power.
+ * 3. If not, perform an aggregation on the 'costs' collection to calculate the report.
+ * 4. If the requested month is in the past (not current month), save the result to 'reports' for future use.
+ */
+
 // GET /api/report?id=123&year=2025&month=1
-// ---------------------------------------------------------
 router.get('/report', async (req, res) => {
   const { id, year, month } = req.query;
 
@@ -99,6 +111,7 @@ router.get('/report', async (req, res) => {
     return badRequest(res, 'MISSING_PARAMS', 'Missing parameters: id, year, month');
   }
 
+  // validate parameters
   const userid = Number(id);
   const reportYear = Number(year);
   const reportMonth = Number(month);
@@ -124,6 +137,7 @@ router.get('/report', async (req, res) => {
       created_at: { $gte: startDate, $lte: endDate }
     });
 
+    // structure the report
     const reportResult = {
       userid,
       year: reportYear,
@@ -131,6 +145,7 @@ router.get('/report', async (req, res) => {
       costs: []
     };
 
+    // group by category
     categories.forEach(cat => {
       const items = costs
         .filter(c => c.category === cat)
@@ -148,6 +163,7 @@ router.get('/report', async (req, res) => {
     const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfRequestedMonth = new Date(reportYear, reportMonth - 1, 1);
 
+    // cache the report if the requested month is in the past
     if (startOfRequestedMonth < startOfCurrentMonth) {
       const newReport = new Report({
         userid,
@@ -160,6 +176,7 @@ router.get('/report', async (req, res) => {
       logger.info({ message: 'Report computed and cached', userid, year: reportYear, month: reportMonth }, 'report cached');
     }
 
+    // return the computed report
     return res.json(reportResult);
 
   } catch (error) {
@@ -168,4 +185,5 @@ router.get('/report', async (req, res) => {
   }
 });
 
+// Export the router
 module.exports = router;

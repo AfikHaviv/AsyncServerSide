@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "test": "cross-env NODE_ENV=test jest --testTimeout=10000"
   },
   "keywords": [],
   "author": "",
@@ -18,5 +19,10 @@
     "pino": "^10.1.0",
     "pino-http": "^11.0.0",
     "pino-mongodb": "^5.0.0"
+  },
+  "devDependencies": {
+    "cross-env": "^10.1.0",
+    "jest": "^30.2.0",
+    "supertest": "^7.2.2"
   }
 }

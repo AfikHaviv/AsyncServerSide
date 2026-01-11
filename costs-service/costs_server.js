@@ -1,3 +1,4 @@
+// costs-service/costs_server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -14,7 +15,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Logging middleware (לכל בקשה)
+// Logging middleware for all requests
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
@@ -32,21 +33,24 @@ app.use((req, res, next) => {
 // Routes
 app.use('/api', costsRouter);
 
+// Health check endpoint
 app.get('/', (req, res) => {
   res.send(`Hello from ${process.env.SERVICE_NAME} on port ${PORT}`);
 });
 
+// Connecting to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
-    console.log('✅ Connected to MongoDB Atlas');
-    logger.info({ service: process.env.SERVICE_NAME }, '✅ Connected to MongoDB Atlas');
+    console.log('Connected to MongoDB Atlas');
+    logger.info({ service: process.env.SERVICE_NAME }, 'Connected to MongoDB Atlas');
   })
   .catch(err => {
-    console.error('❌ Database connection error:', err.message);
-    logger.error({ err: err.message }, '❌ Database connection error');
+    console.error('Database connection error:', err.message);
+    logger.error({ err: err.message }, 'Database connection error');
   });
 
+// Start the server
 app.listen(PORT, () => {
-  console.log(`🚀 Costs Service is running on port ${PORT}`);
+  console.log(`Costs Service is running on port ${PORT}`);
   logger.info({ service: process.env.SERVICE_NAME, status: 'started' }, 'server started');
 });

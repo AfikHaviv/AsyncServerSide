@@ -1,4 +1,4 @@
-// server.js - Template for all services
+// users-service/usres_server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
@@ -6,9 +6,9 @@ const cors = require('cors');
 require('dotenv').config();
 const logger = require('./logger');
 
-const usersRoutes = require('./routes/users');
+const usersRoutes = require('./routes/users.routes');
 
-// טעינת הגדרות מקובץ .env
+// Loading settings from .env file
 dotenv.config();
 
 const app = express();
@@ -16,45 +16,42 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
-app.use(express.json()); // כדי שנוכל לקרוא JSON שנשלח ב-Body
+app.use(express.json()); // To be able to read JSON sent in the Body
 app.use(express.urlencoded({ extended: true }));
 
 app.use(usersRoutes);
 
-
-
-
-// התחברות ל-MongoDB
+// Connecting to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
-    console.log(`✅ Connected to MongoDB Atlas! (Service: ${process.env.SERVICE_NAME})`);
+    console.log(`Connected to MongoDB Atlas! (Service: ${process.env.SERVICE_NAME})`);
   })
   .catch(err => {
-    console.error('❌ Database connection error:', err);
+    console.error('Database connection error:', err);
   });
 
-  // Logging middleware - חובה להוסיף את זה!
+// Logging middleware for all requests
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
     logger.info({
-      service: process.env.SERVICE_NAME,
+      service: process.env.SERVICE_NAME, // log the service name
       method: req.method,
-      url: req.originalUrl,
-      statusCode: res.statusCode,
+      url: req.originalUrl, // originalUrl to get the full path
+      statusCode: res.statusCode, // HTTP status code of the response
       responseTimeMs: Date.now() - start,
     }, 'http request');
   });
   next();
 });
 
-// ראוט בדיקה פשוט
+// simple route to test the server
 app.get('/', (req, res) => {
   res.send(`Hello from ${process.env.SERVICE_NAME} on port ${PORT}`);
 });
 
-// הרצת השרת
+// run the server 
 app.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-   logger.info({ service: process.env.SERVICE_NAME }, 'logger test from users-service');
+  console.log(`Server is running on port ${PORT}`);
+  logger.info({ service: process.env.SERVICE_NAME }, 'logger test from users-service');
 });

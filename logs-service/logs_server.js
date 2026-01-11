@@ -2,11 +2,11 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-require('dotenv').config(); 
+require('dotenv').config();
 const logger = require('./logger');
 
 // 1. Import the Logs Route
-const logsRouter = require('./routes/logs');
+const logsRouter = require('./routes/logs.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3004;
@@ -34,14 +34,14 @@ app.use((req, res, next) => {
 // Connection to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
-    console.log(`✅ Connected to MongoDB Atlas! (Service: ${process.env.SERVICE_NAME})`);
+    console.log(`Connected to MongoDB Atlas! (Service: ${process.env.SERVICE_NAME})`);
   })
   .catch(err => {
-    console.error('❌ Database connection error:', err);
+    console.error('Database connection error:', err);
   });
 
 // 2. Use the Logs Route
-// This creates the endpoint: http://localhost:3004/api/logs
+// This creates the endpoint
 app.use('/api', logsRouter);
 
 // Simple health check route
@@ -49,7 +49,8 @@ app.get('/', (req, res) => {
   res.send(`Hello from ${process.env.SERVICE_NAME}`);
 });
 
+// Start the server
 app.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
   logger.info({ service: process.env.SERVICE_NAME }, 'Server started');
 });

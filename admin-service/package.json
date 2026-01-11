@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
+    "test": "cross-env NODE_ENV=test jest --testTimeout=10000",
     "dev": "nodemon server.js"
   },
   "keywords": [],
@@ -21,6 +22,9 @@
     "pino-mongodb": "^5.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.11"
+    "cross-env": "^10.1.0",
+    "jest": "^30.2.0",
+    "nodemon": "^3.1.11",
+    "supertest": "^7.2.2"
   }
 }
