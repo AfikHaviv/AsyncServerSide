@@ -4,8 +4,8 @@ const router = express.Router();
 const Cost = require('../models/cost.model');
 const Report = require('../models/report.model');
 const logger = require('../logger');
-const fetch = (...args) =>
-  import('node-fetch').then(({ default: fetch }) => fetch(...args));
+const axios = require('axios');
+
 
 // categories allowed
 const categories = ['food', 'health', 'housing', 'sports', 'education'];
@@ -17,9 +17,21 @@ function badRequest(res, id, message) {
 // Check if user exists in users service
 async function userExists(userid) {
   const usersBaseUrl = process.env.USERS_SERVICE_URL || 'http://localhost:3001';
-  const resp = await fetch(`${usersBaseUrl}/api/users/${userid}`);
-  return resp.ok;
+
+  // Axios throws on non-2xx, so we catch and treat as "not exists"
+  try {
+    const resp = await axios.get(`${usersBaseUrl}/api/users/${userid}`, {
+      timeout: 5000,
+    });
+    return resp.status >= 200 && resp.status < 300;
+  } catch (err) {
+    // If the users service is down, you can decide policy.
+    // Here: treat as not found OR service unavailable.
+    // We'll return false and caller will return USER_NOT_FOUND.
+    return false;
+  }
 }
+
 
 // POST /api/add
 router.post('/add', async (req, res) => {
