@@ -4,7 +4,8 @@ const router = express.Router();
 const Cost = require('../models/cost.model');
 const Report = require('../models/report.model');
 const logger = require('../logger');
-const fetch = require('node-fetch'); // Use node-fetch for stable HTTP calls
+const fetch = (...args) =>
+  import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 // categories allowed
 const categories = ['food', 'health', 'housing', 'sports', 'education'];
