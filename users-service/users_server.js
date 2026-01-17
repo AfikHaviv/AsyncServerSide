@@ -19,8 +19,6 @@ app.use(cors());
 app.use(express.json()); // To be able to read JSON sent in the Body
 app.use(express.urlencoded({ extended: true }));
 
-app.use(usersRoutes);
-
 // Connecting to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
@@ -44,6 +42,8 @@ app.use((req, res, next) => {
   });
   next();
 });
+
+app.use(usersRoutes);
 
 // simple route to test the server
 app.get('/', (req, res) => {

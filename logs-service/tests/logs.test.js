@@ -1,45 +1,79 @@
 // tests/logs.test.js
 const request = require('supertest');
 const express = require('express');
-const logsRouter = require('../routes/logs.routes'); // Make sure the path is correct based on your file structure
 
-// Mock Mongoose connection and collection
-// We simulate the chain: mongoose.connection.db.collection('logs').find({}).toArray()
-jest.mock('mongoose', () => {
-  return {
-    connection: {
-      db: {
-        collection: jest.fn().mockReturnValue({
-          find: jest.fn().mockReturnValue({
-            toArray: jest.fn().mockResolvedValue([
-              { level: 'info', message: 'Test log message 1', time: new Date() },
-              { level: 'error', message: 'Test log message 2', time: new Date() }
-            ])
-          })
-        })
-      }
+const logsRouter = require('../routes/logs.routes');
+
+// Mock mongoose so tests do not touch real MongoDB
+jest.mock('mongoose', () => ({
+  connection: {
+    db: {
+      collection: jest.fn()
     }
-  };
-});
+  }
+}));
 
-// Set up Express app for testing
+const mongoose = require('mongoose');
+
 const app = express();
+app.use(express.json());
+
+// Mount routes exactly like server.js (base "/api")
 app.use('/api', logsRouter);
 
-// Tests
-describe('Logs Service Tests', () => {
+describe('Logs Service Tests - GET /api/logs', () => {
 
-  test('GET /api/logs should return a list of logs', async () => {
+  // Reset mocks before each test to keep them independent
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('GET /api/logs should return 200 and an array', async () => {
+    // Prepare a fake logs list from DB
+    const fakeLogs = [
+      { _id: '1', service: 'costs-service', msg: 'hello' },
+      { _id: '2', service: 'users-service', msg: 'world' }
+    ];
+
+    // Mock collection.find().toArray() chain
+    const toArrayMock = jest.fn().mockResolvedValue(fakeLogs);
+    const findMock = jest.fn().mockReturnValue({ toArray: toArrayMock });
+
+    mongoose.connection.db.collection.mockReturnValue({ find: findMock });
+
     const res = await request(app).get('/api/logs');
 
-    // Expect HTTP 200 OK
     expect(res.statusCode).toBe(200);
-
-    // Expect the body to be an array
     expect(Array.isArray(res.body)).toBe(true);
-
-    // Expect the array to contain the mocked data (length 2)
     expect(res.body.length).toBe(2);
-    expect(res.body[0].message).toBe('Test log message 1');
   });
+
+  test('GET /api/logs should return 200 and empty array when no logs exist', async () => {
+    // Mock DB returning empty list
+    const toArrayMock = jest.fn().mockResolvedValue([]);
+    const findMock = jest.fn().mockReturnValue({ toArray: toArrayMock });
+
+    mongoose.connection.db.collection.mockReturnValue({ find: findMock });
+
+    const res = await request(app).get('/api/logs');
+
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body).toEqual([]);
+  });
+
+  test('GET /api/logs should return 500 with id and message on DB error', async () => {
+    // Mock DB failure
+    const toArrayMock = jest.fn().mockRejectedValue(new Error('DB fail'));
+    const findMock = jest.fn().mockReturnValue({ toArray: toArrayMock });
+
+    mongoose.connection.db.collection.mockReturnValue({ find: findMock });
+
+    const res = await request(app).get('/api/logs');
+
+    expect(res.statusCode).toBe(500);
+    expect(res.body).toHaveProperty('id', 'LOGS_FETCH_ERROR');
+    expect(res.body).toHaveProperty('message');
+  });
+
 });

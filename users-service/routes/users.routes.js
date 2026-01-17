@@ -114,7 +114,6 @@ router.get('/api/users/:id', async (req, res) => {
       first_name: user.first_name,
       last_name: user.last_name,
       total: totalCosts, // return total costs
-      birthday: user.birthday // return birthday
     });
   } catch (err) {
     return sendError(res, 500, 'SERVER_ERROR', err.message || 'unexpected error');

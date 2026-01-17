@@ -1,4 +1,4 @@
-// admin-service/routes/about.js
+// admin-service/routes/about.routes.js
 const express = require('express');
 const router = express.Router();
 
