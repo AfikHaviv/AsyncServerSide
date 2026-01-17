@@ -10,6 +10,7 @@ node_modules
 .DS_Store
 
 tester.py
+test.py
 result.txt
 res.txt
 *.txt
