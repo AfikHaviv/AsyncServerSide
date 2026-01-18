@@ -15,7 +15,7 @@ if (process.env.NODE_ENV === 'test') {
 } else {
   // In normal mode (development/production), connect to MongoDB
   if (!process.env.MONGODB_URI) {
-    console.error('❌ FATAL ERROR: MONGODB_URI is undefined in logger.js. Check your .env file!');
+    console.error(' FATAL ERROR: MONGODB_URI is undefined in logger.js. Check your .env file!');
     process.exit(1);
   }
 
