@@ -4,9 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node admin_server.js",
     "test": "cross-env NODE_ENV=test jest --testTimeout=10000",
-    "dev": "nodemon server.js"
+    "dev": "nodemon admin_server.js"
   },
   "keywords": [],
   "author": "",

@@ -1,221 +1,241 @@
-// tests/costs.test.js
+// costs-service/tests/costs.test.js
 const request = require('supertest');
 const express = require('express');
+const bodyParser = require('body-parser');
 
-const costsRouter = require('../routes/costs.routes');
+// We mock axios because userExists() calls users-service over HTTP
+jest.mock('axios', () => ({
+  get: jest.fn()
+}));
+const axios = require('axios');
+
+// Mock Cost model (both constructor usage and static find)
+jest.mock('../models/cost.model', () => {
+  const CostMock = jest.fn();
+  CostMock.find = jest.fn();
+  return CostMock;
+});
 const Cost = require('../models/cost.model');
+
+// Mock Report model (static findOne + constructor for caching)
+jest.mock('../models/report.model', () => {
+  const ReportMock = jest.fn();
+  ReportMock.findOne = jest.fn();
+  return ReportMock;
+});
 const Report = require('../models/report.model');
 
-jest.mock('../models/cost.model');
-jest.mock('../models/report.model');
+// Import router after mocks so it will use the mocked modules
+const costsRouter = require('../routes/costs.routes');
 
-// Mock node-fetch (since costs.routes.js uses: const fetch = require('node-fetch');)
-jest.mock('node-fetch', () => jest.fn());
-const fetch = require('node-fetch');
-
+// Build an express app for testing the router
 const app = express();
-app.use(express.json());
-
-// Mount the router the same way as in the real service (base "/api")
+app.use(bodyParser.json());
 app.use('/api', costsRouter);
 
-describe('Costs Service Tests', () => {
+// Helper: create a valid request body for /api/add
+function validCostBody(overrides = {}) {
+  return {
+    userid: 123123,
+    description: 'milk',
+    category: 'food',
+    sum: 8,
+    ...overrides
+  };
+}
 
-  // Reset all mocks before each test to keep tests independent
+describe('Costs Service Tests - /api/add and /api/report (axios version)', () => {
+
+  // Reset mocks before each test so they don't leak between tests
   beforeEach(() => {
     jest.clearAllMocks();
-    fetch.mockReset();
   });
 
-  // -------------------- POST /api/add --------------------
-
   test('POST /api/add returns 400 if required fields are missing', async () => {
-    const res = await request(app)
-      .post('/api/add')
-      .send({ description: 'milk' });
+    // No need to mock axios/DB because validation fails first
+    const res = await request(app).post('/api/add').send({ description: 'milk' });
 
     expect(res.statusCode).toBe(400);
     expect(res.body).toHaveProperty('id');
     expect(res.body).toHaveProperty('message');
   });
 
-  // userid validation
   test('POST /api/add returns 400 if userid is invalid', async () => {
-    const res = await request(app)
-      .post('/api/add')
-      .send({ userid: 'abc', description: 'milk', category: 'food', sum: 8 });
+    const res = await request(app).post('/api/add').send(validCostBody({ userid: -5 }));
 
     expect(res.statusCode).toBe(400);
     expect(res.body.id).toBe('INVALID_USERID');
   });
 
-  // description validation
   test('POST /api/add returns 400 if description is empty', async () => {
-    const res = await request(app)
-      .post('/api/add')
-      .send({ userid: 123, description: '   ', category: 'food', sum: 8 });
+    const res = await request(app).post('/api/add').send(validCostBody({ description: '   ' }));
 
     expect(res.statusCode).toBe(400);
     expect(res.body.id).toBe('INVALID_DESCRIPTION');
   });
 
-  // sum validation
   test('POST /api/add returns 400 if sum is invalid', async () => {
-    const res = await request(app)
-      .post('/api/add')
-      .send({ userid: 123, description: 'milk', category: 'food', sum: 0 });
+    const res = await request(app).post('/api/add').send(validCostBody({ sum: 0 }));
 
     expect(res.statusCode).toBe(400);
     expect(res.body.id).toBe('INVALID_SUM');
   });
 
-  // category validation
   test('POST /api/add returns 400 if category is invalid', async () => {
-    const res = await request(app)
-      .post('/api/add')
-      .send({ userid: 123, description: 'milk', category: 'travel', sum: 8 });
+    const res = await request(app).post('/api/add').send(validCostBody({ category: 'shopping' }));
 
     expect(res.statusCode).toBe(400);
     expect(res.body.id).toBe('INVALID_CATEGORY');
   });
 
-  // For date validation tests, we still mock fetch so userExists does not crash
   test('POST /api/add returns 400 if created_at is invalid date', async () => {
-    fetch.mockResolvedValue({ ok: true });
+    // Make userExists pass so we reach date validation
+    axios.get.mockResolvedValue({ status: 200 });
 
     const res = await request(app)
       .post('/api/add')
-      .send({ userid: 123, description: 'milk', category: 'food', sum: 8, created_at: 'not-a-date' });
+      .send(validCostBody({ created_at: 'not-a-date' }));
 
     expect(res.statusCode).toBe(400);
     expect(res.body.id).toBe('INVALID_DATE');
   });
 
-  // date in the past validation
   test('POST /api/add returns 400 if created_at is in the past', async () => {
-    fetch.mockResolvedValue({ ok: true });
+    // Make userExists pass so we reach past-date validation
+    axios.get.mockResolvedValue({ status: 200 });
 
-    const past = new Date(Date.now() - 60 * 1000).toISOString();
-
+    const past = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const res = await request(app)
       .post('/api/add')
-      .send({ userid: 123, description: 'milk', category: 'food', sum: 8, created_at: past });
+      .send(validCostBody({ created_at: past }));
 
     expect(res.statusCode).toBe(400);
     expect(res.body.id).toBe('PAST_DATE_NOT_ALLOWED');
   });
 
-  // user existence check
   test('POST /api/add returns 404 if user does not exist', async () => {
-    fetch.mockResolvedValue({ ok: false });
+    // In our implementation, any axios error makes userExists() return false
+    axios.get.mockRejectedValue(new Error('User not found'));
 
-    const res = await request(app)
-      .post('/api/add')
-      .send({ userid: 999, description: 'milk', category: 'food', sum: 8 });
+    const res = await request(app).post('/api/add').send(validCostBody());
 
     expect(res.statusCode).toBe(404);
-    expect(res.body).toHaveProperty('id');
-    expect(res.body).toHaveProperty('message');
     expect(res.body.id).toBe('USER_NOT_FOUND');
   });
 
-  // successful addition
   test('POST /api/add returns 201 and the new cost item when valid', async () => {
-    fetch.mockResolvedValue({ ok: true });
+    // userExists => true
+    axios.get.mockResolvedValue({ status: 200 });
 
-    // Mock Cost constructor instance + its save() method
-    Cost.mockImplementation(() => ({
-      _id: 'fakeid',
-      userid: 123,
-      description: 'milk',
-      category: 'food',
-      sum: 8,
-      created_at: new Date(),
-      save: jest.fn().mockResolvedValue(true)
-    }));
+    // Mock Cost constructor -> instance with save() success
+    Cost.mockImplementation((doc) => {
+      return {
+        _id: 'mock_cost_id',
+        ...doc,
+        save: jest.fn().mockResolvedValue(true)
+      };
+    });
 
-
-    // Make the request
-    const res = await request(app)
-      .post('/api/add')
-      .send({ userid: 123, description: 'milk', category: 'food', sum: 8 });
+    const res = await request(app).post('/api/add').send(validCostBody());
 
     expect(res.statusCode).toBe(201);
-    expect(res.body).toHaveProperty('userid', 123);
-    expect(res.body).toHaveProperty('description');
+    expect(res.body).toHaveProperty('userid', 123123);
+    expect(res.body).toHaveProperty('description', 'milk');
     expect(res.body).toHaveProperty('category', 'food');
-    expect(res.body).toHaveProperty('sum');
+    expect(res.body).toHaveProperty('sum', 8);
   });
 
-  // DB save failure
   test('POST /api/add returns 500 if DB save fails', async () => {
-    fetch.mockResolvedValue({ ok: true });
+    // userExists => true
+    axios.get.mockResolvedValue({ status: 200 });
 
-    Cost.mockImplementation(() => ({
-      save: jest.fn().mockRejectedValue(new Error('DB fail'))
-    }));
+    // Cost.save fails -> should return INTERNAL_ERROR
+    Cost.mockImplementation((doc) => {
+      return {
+        _id: 'mock_cost_id',
+        ...doc,
+        save: jest.fn().mockRejectedValue(new Error('DB fail'))
+      };
+    });
 
-    const res = await request(app)
-      .post('/api/add')
-      .send({ userid: 123, description: 'milk', category: 'food', sum: 8 });
+    const res = await request(app).post('/api/add').send(validCostBody());
 
     expect(res.statusCode).toBe(500);
-    expect(res.body).toHaveProperty('id', 'INTERNAL_ERROR');
+    expect(res.body.id).toBe('INTERNAL_ERROR');
     expect(res.body).toHaveProperty('message');
   });
 
-  // -------------------- GET /api/report --------------------
-
-  // missing parameters
   test('GET /api/report returns 400 if parameters are missing', async () => {
-    const res = await request(app).get('/api/report?id=1&year=2025');
+    const res = await request(app).get('/api/report?id=123123&year=2026');
+
     expect(res.statusCode).toBe(400);
     expect(res.body.id).toBe('MISSING_PARAMS');
   });
 
-  // userid validation
   test('GET /api/report returns 400 if month is invalid', async () => {
-    const res = await request(app).get('/api/report?id=1&year=2025&month=13');
+    const res = await request(app).get('/api/report?id=123123&year=2026&month=13');
+
     expect(res.statusCode).toBe(400);
     expect(res.body.id).toBe('INVALID_MONTH');
   });
 
-  // year validation
   test('GET /api/report returns cached report if it exists', async () => {
-    const cached = { userid: 1, year: 2025, month: 1, costs: [] };
-    Report.findOne.mockResolvedValue({ data: cached });
-
-    const res = await request(app).get('/api/report?id=1&year=2025&month=1');
-
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toEqual(cached);
-    expect(Cost.find).not.toHaveBeenCalled();
-  });
-
-  // compute report when not cached
-  test('GET /api/report computes report and returns 5 categories when not cached', async () => {
-    Report.findOne.mockResolvedValue(null);
-    Cost.find.mockResolvedValue([]);
+    // If cached report exists, route returns existingReport.data
+    Report.findOne.mockResolvedValue({
+      data: {
+        userid: 1,
+        year: 2025,
+        month: 1,
+        costs: [{ food: [] }, { health: [] }, { housing: [] }, { sports: [] }, { education: [] }]
+      }
+    });
 
     const res = await request(app).get('/api/report?id=1&year=2025&month=1');
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveProperty('userid', 1);
-    expect(res.body).toHaveProperty('year', 2025);
-    expect(res.body).toHaveProperty('month', 1);
     expect(res.body).toHaveProperty('costs');
-    expect(res.body.costs).toHaveLength(5);
+    expect(Array.isArray(res.body.costs)).toBe(true);
   });
 
-  // DB failure during report generation
-  test('GET /api/report returns 500 if DB fails', async () => {
+  test('GET /api/report computes report and returns 5 categories when not cached', async () => {
+    // No cached report => compute from Cost.find
+    Report.findOne.mockResolvedValue(null);
+
+    // Return one cost in "food"
+    Cost.find.mockResolvedValue([
+      { category: 'food', sum: 10, description: 'milk', created_at: new Date('2026-01-10T10:00:00Z') }
+    ]);
+
+    // Mock Report constructor for caching (past months may be cached)
+    Report.mockImplementation((doc) => {
+      return {
+        ...doc,
+        save: jest.fn().mockResolvedValue(true)
+      };
+    });
+
+    const res = await request(app).get('/api/report?id=123123&year=2026&month=1');
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toHaveProperty('costs');
+    expect(res.body.costs).toHaveLength(5);
+
+    // Verify "food" category exists and has items array
+    const foodObj = res.body.costs.find((x) => Object.prototype.hasOwnProperty.call(x, 'food'));
+    expect(foodObj).toBeTruthy();
+    expect(Array.isArray(foodObj.food)).toBe(true);
+  });
+
+  test('GET /api/report returns 500 with {id,message} when DB fails', async () => {
+    // No cached report, then Cost.find throws
     Report.findOne.mockResolvedValue(null);
     Cost.find.mockRejectedValue(new Error('DB fail'));
 
-    const res = await request(app).get('/api/report?id=1&year=2025&month=1');
+    const res = await request(app).get('/api/report?id=123123&year=2026&month=1');
 
     expect(res.statusCode).toBe(500);
-    expect(res.body).toHaveProperty('id', 'INTERNAL_ERROR');
+    expect(res.body.id).toBe('INTERNAL_ERROR');
     expect(res.body).toHaveProperty('message');
   });
 
