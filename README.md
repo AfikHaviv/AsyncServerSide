@@ -223,7 +223,7 @@ Create a `.env` file inside each service directory. All services share the same 
 ```env
 PORT=3001                          # Adjust per service: 3001–3004
 SERVICE_NAME=Users-Service         # Identifier used in log entries
-MONGODB_URI=mongodb+srv://admin:ServerSide1234@asyncserverside.hbqmzam.mongodb.net/cost-manager-db
+MONGODB_URI=URI_HERE                     # MongoDB Atlas connection string
 ```
 
 ### Costs Service only
